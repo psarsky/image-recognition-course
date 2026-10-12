@@ -1,6 +1,10 @@
+from pathlib import Path
+
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+
+PARENT_DIR = Path(__file__).resolve().parent
 
 
 def make_shape(c):
@@ -15,52 +19,61 @@ def make_shape(c):
         cv2.fillPoly(img, [np.array([[32, 10], [54, 52], [10, 52]])], 255)
     return img
 
+
 def transform(img):
-    M = cv2.getRotationMatrix2D((32, 32), np.random.uniform(-30, 30), np.random.uniform(0.7, 1.1))
+    M = cv2.getRotationMatrix2D(
+        (32, 32), np.random.uniform(-30, 30), np.random.uniform(0.7, 1.1)
+    )
     M[0, 1] += np.random.uniform(-0.2, 0.2)
     M[:, 2] += np.random.uniform(-5, 5, 2)
     return cv2.warpAffine(img, M, (64, 64), flags=cv2.INTER_NEAREST)
 
+
 def descriptor(img):
     F = np.abs(np.fft.fftshift(np.fft.fft2(img)))
-    d = F[28:36, 28:36].flatten()
+    d = F[28:37, 28:37].flatten()
     return d / d.max()
 
-names = np.array(["circle", "rectangle", "rhombus", "triangle"])
-db_labels = np.repeat(np.arange(4), 20)
-db_imgs = [transform(make_shape(c)) for c in db_labels]
-db_desc = np.array([descriptor(x) for x in db_imgs])
-np.save("descriptors.npy", db_desc)
 
-qc = np.random.randint(4)
-query = transform(make_shape(qc))
-q = descriptor(query)
+def main():
+    names = np.array(["circle", "rectangle", "diamond", "triangle"])
+    db_labels = np.repeat(np.arange(4), 20)
+    db_imgs = [transform(make_shape(c)) for c in db_labels]
+    db_desc = np.array([descriptor(x) for x in db_imgs])
+    np.savez(PARENT_DIR / "database.npz", imgs=db_imgs, desc=db_desc, labels=db_labels)
 
-while True:
-    method = input("Method (euclid/cos/knn): ")
-    if method in {"euclid", "cos", "knn"}:
-        break
-    print("Incorrect input, valid methods: euclid, cos, knn")
+    qc = np.random.randint(4)
+    query = transform(make_shape(qc))
+    q = descriptor(query)
 
-if method == "cos":
-    dist = 1 - db_desc @ q / (np.linalg.norm(db_desc, axis=1) * np.linalg.norm(q))
-else:
-    dist = np.linalg.norm(db_desc - q, axis=1)
-best = np.argmin(dist)
-if method == "knn":
-    nn = np.argsort(dist)[:5]
-    pred = np.bincount(db_labels[nn]).argmax()
-    best = nn[db_labels[nn] == pred][0]
+    while True:
+        method = input("Method (e - euclid, c - cos, k - knn): ")
+        if method in {"e", "c", "k"}:
+            break
+        print("Incorrect input")
 
-print("method:", method)
-print("query class:", names[qc])
-print("found class:", names[db_labels[best]])
-print("distance:", dist[best])
+    if method == "c":
+        dist = 1 - db_desc @ q / (np.linalg.norm(db_desc, axis=1) * np.linalg.norm(q))
+    else:
+        dist = np.linalg.norm(db_desc - q, axis=1)
+    best = np.argmin(dist)
+    if method == "k":
+        nn = np.argsort(dist)[:5]
+        pred = np.bincount(db_labels[nn]).argmax()
+        best = nn[db_labels[nn] == pred][0]
 
-plt.subplot(1, 2, 1)
-plt.imshow(query, cmap="gray")
-plt.title("query: " + names[qc])
-plt.subplot(1, 2, 2)
-plt.imshow(db_imgs[best], cmap="gray")
-plt.title(f"{names[db_labels[best]]}, d={dist[best]:.4f}")
-plt.show()
+    print("method:", method)
+    print("query class:", names[qc])
+    print("found class:", names[db_labels[best]])
+    print("distance:", dist[best])
+
+    plt.subplot(1, 2, 1)
+    plt.imshow(query, cmap="gray")
+    plt.title("query: " + names[qc])
+    plt.subplot(1, 2, 2)
+    plt.imshow(db_imgs[best], cmap="gray")
+    plt.title(f"{names[db_labels[best]]}, d={dist[best]:.4f}")
+    plt.show()
+
+if __name__ == "__main__":
+    main()
