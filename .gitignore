@@ -2,3 +2,5 @@
 .vscode
 *.npz
 *.png
+*.jpg
+*.pdf
