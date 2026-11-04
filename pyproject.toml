@@ -11,4 +11,5 @@ dependencies = [
     "opencv-python>=5.0.0.93",
     "pywavelets>=1.10.0",
     "scikit-image>=0.26.0",
+    "scikit-learn>=1.9.1",
 ]
